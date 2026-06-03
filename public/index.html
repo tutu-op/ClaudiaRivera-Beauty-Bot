@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lupita Cuéllar Beauty Center — Agendar Cita</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Jost', sans-serif;
+      background: #f5f0eb;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .lc-wrap {
+      width: 100%;
+      max-width: 420px;
+      background: #fff;
+      border: 0.5px solid #e0d6cc;
+      border-radius: 18px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 620px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+    }
+
+    .lc-header {
+      background: #1a1014;
+      padding: 1.2rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .lc-avatar {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: linear-gradient(135deg, #c9a46e, #e8c99a);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 15px; color: #1a1014; font-weight: 400; flex-shrink: 0;
+    }
+    .lc-header-info { flex: 1; }
+    .lc-header-name { font-family: 'Cormorant Garamond', serif; font-size: 17px; color: #e8c99a; font-weight: 300; letter-spacing: 0.5px; }
+    .lc-header-sub { font-size: 11px; color: #8a7060; font-weight: 300; letter-spacing: 0.5px; margin-top: 1px; }
+    .lc-online { width: 8px; height: 8px; border-radius: 50%; background: #6fcf97; flex-shrink: 0; }
+
+    .lc-messages {
+      flex: 1; overflow-y: auto; padding: 1rem 1rem 0.5rem;
+      display: flex; flex-direction: column; gap: 10px;
+      background: #faf7f4;
+    }
+    .lc-messages::-webkit-scrollbar { width: 4px; }
+    .lc-messages::-webkit-scrollbar-thumb { background: #e0d6cc; border-radius: 2px; }
+
+    .msg { display: flex; flex-direction: column; max-width: 88%; }
+    .msg.bot { align-self: flex-start; }
+    .msg.user { align-self: flex-end; }
+
+    .bubble { padding: 10px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.55; }
+    .bot .bubble { background: #fff; border: 0.5px solid #e0d6cc; color: #2a1f1a; border-bottom-left-radius: 4px; }
+    .user .bubble { background: #1a1014; color: #e8c99a; border-bottom-right-radius: 4px; }
+
+    .msg-time { font-size: 10px; color: #aaa; margin-top: 3px; }
+    .bot .msg-time { align-self: flex-start; margin-left: 4px; }
+    .user .msg-time { align-self: flex-end; margin-right: 4px; }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .chip {
+      padding: 5px 12px; border-radius: 20px; font-size: 12px;
+      cursor: pointer; transition: all 0.15s;
+      background: #fff; border: 0.5px solid #c9a46e; color: #c9a46e;
+      font-family: 'Jost', sans-serif;
+    }
+    .chip:hover { background: #c9a46e; color: #1a1014; }
+
+    .lc-input-area {
+      padding: 12px; border-top: 0.5px solid #e0d6cc;
+      display: flex; gap: 8px; align-items: center; flex-shrink: 0;
+      background: #fff;
+    }
+    .lc-input {
+      flex: 1; border: 0.5px solid #ddd; border-radius: 20px;
+      padding: 9px 14px; font-size: 13px; font-family: 'Jost', sans-serif;
+      background: #faf7f4; color: #2a1f1a; outline: none;
+    }
+    .lc-input:focus { border-color: #c9a46e; }
+    .lc-send {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: #1a1014; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: #c9a46e; flex-shrink: 0; font-size: 18px;
+    }
+    .lc-send:hover { opacity: 0.8; }
+
+    .typing { display: flex; gap: 4px; padding: 12px 14px; align-items: center; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: #c9a46e; animation: bounce 1.2s infinite; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-5px)} }
+
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 8px; }
+    .cal-day-name { font-size: 10px; color: #888; text-align: center; padding: 3px 0; }
+    .cal-day { font-size: 11.5px; text-align: center; padding: 5px 2px; border-radius: 6px; cursor: pointer; color: #2a1f1a; }
+    .cal-day:hover:not(.disabled):not(.empty) { background: #c9a46e22; }
+    .cal-day.disabled { color: #ccc; cursor: default; }
+    .cal-day.selected { background: #1a1014; color: #e8c99a !important; }
+    .cal-day.today { border: 0.5px solid #c9a46e; }
+
+    .time-slots { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+    .tslot {
+      padding: 4px 10px; border-radius: 12px; font-size: 11.5px; cursor: pointer;
+      border: 0.5px solid #ddd; color: #2a1f1a; background: #fff;
+    }
+    .tslot:hover { border-color: #c9a46e; color: #c9a46e; }
+    .tslot.selected { background: #1a1014; color: #e8c99a; border-color: #1a1014; }
+
+    .form-field { margin-top: 8px; }
+    .form-label { font-size: 11px; color: #888; margin-bottom: 3px; }
+    .form-input {
+      width: 100%; padding: 7px 10px; border-radius: 8px; font-size: 12.5px;
+      border: 0.5px solid #ddd; background: #faf7f4; color: #2a1f1a;
+      font-family: 'Jost', sans-serif; outline: none;
+    }
+    .form-input:focus { border-color: #c9a46e; }
+
+    .confirm-btn {
+      margin-top: 10px; width: 100%; padding: 9px; border-radius: 10px;
+      background: #1a1014; color: #e8c99a; border: none; cursor: pointer;
+      font-family: 'Jost', sans-serif; font-size: 13px; font-weight: 500;
+      letter-spacing: 0.5px; transition: opacity 0.15s;
+    }
+    .confirm-btn:hover { opacity: 0.8; }
+    .confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .success-box {
+      background: #f0faf4; border: 0.5px solid #6fcf9744;
+      border-radius: 10px; padding: 10px 12px; margin-top: 8px;
+      font-size: 12.5px; color: #2a1f1a; line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+<div class="lc-wrap">
+  <div class="lc-header">
+    <div class="lc-avatar">LC</div>
+    <div class="lc-header-info">
+      <div class="lc-header-name">Lupita Cuéllar</div>
+      <div class="lc-header-sub">Beauty Center · En línea</div>
+    </div>
+    <div class="lc-online"></div>
+  </div>
+
+  <div class="lc-messages" id="msgs"></div>
+
+  <div class="lc-input-area">
+    <input class="lc-input" id="inp" placeholder="Escribe un mensaje..." />
+    <button class="lc-send" onclick="sendUserMsg()">➤</button>
+  </div>
+</div>
+
+<script>
+const SERVICES = [
+  "Micropigmentación","Colorimetría capilar","Corte","Tratamientos capilares",
+  "Tratamientos faciales","Masajes","Lashes","Pedicure","Manicure",
+  "Peinado y maquillaje","Barber Shop"
+];
+
+const SCHEDULE = {
+  1:{am:["10:00","10:30","11:00","11:30","12:00","12:30","13:00"],pm:["16:30","17:00","17:30","18:00","18:30","19:00","19:30"]},
+  2:{am:["10:00","10:30","11:00","11:30","12:00","12:30","13:00"],pm:["16:30","17:00","17:30","18:00","18:30","19:00","19:30"]},
+  3:{am:["10:00","10:30","11:00","11:30","12:00","12:30","13:00"],pm:["16:30","17:00","17:30","18:00","18:30","19:00","19:30"]},
+  4:{am:["10:00","10:30","11:00","11:30","12:00","12:30","13:00"],pm:["16:30","17:00","17:30","18:00","18:30","19:00","19:30"]},
+  5:{am:["10:00","10:30","11:00","11:30","12:00","12:30","13:00"],pm:["16:30","17:00","17:30","18:00","18:30","19:00","19:30"]},
+  6:{am:["8:30","9:00","9:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00"],pm:["13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30"]}
+};
+
+let state = { service:null, date:null, time:null, name:null, phone:null };
+
+function nowTime() {
+  const d = new Date();
+  return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+}
+
+function addMsg(type, content) {
+  const msgs = document.getElementById('msgs');
+  const div = document.createElement('div');
+  div.className = 'msg ' + type;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  if (typeof content === 'string') bubble.innerHTML = content;
+  else bubble.appendChild(content);
+  div.appendChild(bubble);
+  const t = document.createElement('div');
+  t.className = 'msg-time'; t.textContent = nowTime();
+  div.appendChild(t);
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return bubble;
+}
+
+function typing(cb) {
+  const msgs = document.getElementById('msgs');
+  const div = document.createElement('div');
+  div.className = 'msg bot';
+  div.id = 'typing-indicator';
+  div.innerHTML = '<div class="bubble"><div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>';
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  setTimeout(() => { const el = document.getElementById('typing-indicator'); if(el) el.remove(); cb(); }, 900);
+}
+
+function chips(arr, onClick) {
+  const c = document.createElement('div'); c.className = 'chips';
+  arr.forEach(label => {
+    const b = document.createElement('button'); b.className = 'chip'; b.textContent = label;
+    b.onclick = () => onClick(label);
+    c.appendChild(b);
+  });
+  return c;
+}
+
+function askService() {
+  typing(() => {
+    const d = document.createElement('div');
+    d.innerHTML = '¿Qué servicio deseas agendar? 💅';
+    d.appendChild(chips(SERVICES, s => {
+      state.service = s;
+      addMsg('user', s);
+      askDate();
+    }));
+    addMsg('bot', d);
+  });
+}
+
+let timeContainer = null;
+
+function askDate() {
+  typing(() => {
+    const d = document.createElement('div');
+    d.innerHTML = '<span>Elige una fecha 📅</span>';
+    d.appendChild(buildCal());
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:11px;color:#888;margin-top:8px;margin-bottom:2px';
+    label.textContent = 'Horarios disponibles:';
+    d.appendChild(label);
+    timeContainer = document.createElement('div');
+    d.appendChild(timeContainer);
+    addMsg('bot', d);
+  });
+}
+
+function buildCal() {
+  const today = new Date();
+  const year = today.getFullYear(), month = today.getMonth();
+  const wrap = document.createElement('div');
+  const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const header = document.createElement('div');
+  header.style.cssText = 'font-size:12px;font-weight:500;margin-bottom:4px;color:#888';
+  header.textContent = monthNames[month] + ' ' + year;
+  wrap.appendChild(header);
+  const grid = document.createElement('div'); grid.className = 'cal-grid';
+  ['Lu','Ma','Mi','Ju','Vi','Sá','Do'].forEach(d => {
+    const n = document.createElement('div'); n.className = 'cal-day-name'; n.textContent = d; grid.appendChild(n);
+  });
+  let startDay = new Date(year, month, 1).getDay() - 1;
+  if (startDay < 0) startDay = 6;
+  for (let i = 0; i < startDay; i++) { const e = document.createElement('div'); e.className = 'cal-day empty'; grid.appendChild(e); }
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const cell = document.createElement('div'); cell.className = 'cal-day'; cell.textContent = d;
+    const date = new Date(year, month, d);
+    const dow = date.getDay();
+    const isPast = date < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    if (isPast || dow === 0) { cell.classList.add('disabled'); }
+    else {
+      if (d === today.getDate()) cell.classList.add('today');
+      cell.onclick = () => {
+        wrap.querySelectorAll('.cal-day').forEach(c => c.classList.remove('selected'));
+        cell.classList.add('selected');
+        state.date = date;
+        if (timeContainer) { timeContainer.innerHTML = ''; timeContainer.appendChild(buildTimeSlots(date)); }
+      };
+    }
+    grid.appendChild(cell);
+  }
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+function buildTimeSlots(date) {
+  const dow = date.getDay();
+  const sched = SCHEDULE[dow];
+  const wrap = document.createElement('div');
+  if (!sched) { wrap.innerHTML = '<span style="font-size:12px;color:#aaa">No hay horarios disponibles.</span>'; return wrap; }
+  const slots = document.createElement('div'); slots.className = 'time-slots';
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const allSlots = [...sched.am, ...sched.pm].filter(t => {
+    if (!isToday) return true;
+    const [h, m] = t.split(':').map(Number);
+    return (h * 60 + m) > (now.getHours() * 60 + now.getMinutes() + 30);
+  });
+  if (allSlots.length === 0) { wrap.innerHTML = '<span style="font-size:12px;color:#aaa">No hay más horarios disponibles hoy.</span>'; return wrap; }
+  allSlots.forEach(t => {
+    const b = document.createElement('button'); b.className = 'tslot'; b.textContent = t;
+    b.onclick = () => {
+      slots.querySelectorAll('.tslot').forEach(s => s.classList.remove('selected'));
+      b.classList.add('selected');
+      state.time = t;
+      const days = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+      const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      const ds = days[date.getDay()]+' '+date.getDate()+' de '+months[date.getMonth()];
+      addMsg('user', ds + ' · ' + t);
+      askContact();
+    };
+    slots.appendChild(b);
+  });
+  wrap.appendChild(slots);
+  return wrap;
+}
+
+function askContact() {
+  typing(() => {
+    const d = document.createElement('div');
+    d.innerHTML = 'Perfecto ✨ Ya casi terminamos. Necesito tus datos:';
+
+    const nf = document.createElement('div'); nf.className = 'form-field';
+    nf.innerHTML = '<div class="form-label">Tu nombre completo</div>';
+    const ni = document.createElement('input'); ni.className = 'form-input'; ni.placeholder = 'Ej. María García'; ni.type = 'text';
+    nf.appendChild(ni); d.appendChild(nf);
+
+    const pf = document.createElement('div'); pf.className = 'form-field';
+    pf.innerHTML = '<div class="form-label">Número de WhatsApp</div>';
+    const pi = document.createElement('input'); pi.className = 'form-input'; pi.placeholder = ' 312 123 1230'; pi.type = 'tel';
+    pf.appendChild(pi); d.appendChild(pf);
+
+    const btn = document.createElement('button'); btn.className = 'confirm-btn'; btn.textContent = 'Confirmar cita →';
+    btn.onclick = async () => {
+      if (!ni.value.trim() || !pi.value.trim()) {
+        ni.style.borderColor = '#E24B4A'; pi.style.borderColor = '#E24B4A'; return;
+      }
+      state.name = ni.value.trim();
+      state.phone = pi.value.trim();
+      btn.disabled = true; btn.textContent = 'Enviando...';
+      addMsg('user', state.name + ' · ' + state.phone);
+      await confirmarCita(btn);
+    };
+    d.appendChild(btn);
+    addMsg('bot', d);
+  });
+}
+
+async function confirmarCita(btn) {
+  // Formatear fecha como YYYY-MM-DD
+  const fecha = state.date.toISOString().split('T')[0];
+
+  try {
+    const res = await fetch('/api/citas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre: state.name,
+        telefono: state.phone,
+        servicio: state.service,
+        fecha: fecha,
+        hora: state.time
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.ok) {
+      showSuccess();
+    } else {
+      btn.disabled = false; btn.textContent = 'Confirmar cita →';
+      typing(() => addMsg('bot', '❌ Hubo un error al agendar. Intenta de nuevo.'));
+    }
+  } catch (err) {
+    btn.disabled = false; btn.textContent = 'Confirmar cita →';
+    typing(() => addMsg('bot', '❌ No se pudo conectar al servidor. Intenta de nuevo.'));
+  }
+}
+
+function showSuccess() {
+  typing(() => {
+    const days = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+    const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const ds = days[state.date.getDay()]+' '+state.date.getDate()+' de '+months[state.date.getMonth()];
+
+    const d = document.createElement('div');
+    d.innerHTML = `¡Listo, <b>${state.name}</b>! 🎉`;
+
+    const box = document.createElement('div'); box.className = 'success-box';
+    box.innerHTML =
+      `✦ <b>Servicio:</b> ${state.service}<br>` +
+      `✦ <b>Fecha:</b> ${ds}<br>` +
+      `✦ <b>Hora:</b> ${state.time}<br><br>` +
+      `📲 Te hemos enviado una confirmación por WhatsApp. El día anterior te mandaremos un recordatorio automático.`;
+    d.appendChild(box);
+
+    const restart = document.createElement('button');
+    restart.className = 'confirm-btn';
+    restart.style.cssText = 'margin-top:8px;background:transparent;color:#888;border:0.5px solid #ddd';
+    restart.textContent = 'Agendar otra cita';
+    restart.onclick = () => {
+      state = { service:null, date:null, time:null, name:null, phone:null };
+      askService();
+    };
+    d.appendChild(restart);
+    addMsg('bot', d);
+  });
+}
+
+document.getElementById('inp').addEventListener('keypress', e => { if (e.key === 'Enter') sendUserMsg(); });
+
+function sendUserMsg() {
+  const inp = document.getElementById('inp');
+  const val = inp.value.trim(); if (!val) return;
+  inp.value = '';
+  addMsg('user', val);
+  typing(() => addMsg('bot', 'Para agendar tu cita usa las opciones del menú 😊'));
+}
+
+// Arrancar
+setTimeout(() => {
+  typing(() => {
+    addMsg('bot', '¡Hola! 👋 Bienvenida a <b>Lupita Cuéllar Beauty Center</b>.<br>Estoy aquí para ayudarte a agendar tu cita. ¿Comenzamos?');
+    setTimeout(askService, 500);
+  });
+}, 300);
+</script>
+</body>
+</html>

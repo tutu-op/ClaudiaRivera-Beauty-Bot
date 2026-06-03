@@ -1,0 +1,21 @@
+{
+  "name": "lupita-beauty-bot",
+  "version": "1.0.0",
+  "description": "Sistema de citas con recordatorios WhatsApp para Lupita Cuéllar Beauty Center",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.18.3",
+    "node-cron": "^3.0.3",
+    "sql.js": "^1.12.0",
+    "twilio": "^5.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
