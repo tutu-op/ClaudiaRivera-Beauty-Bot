@@ -1,8 +1,10 @@
 const db = require('./database');
 
 const NEGOCIO = 'Claudia Rivera Beauty Center';
+const DIVIDER = '┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄';
 
 const SERVICES = ['Uñas', 'Color', 'Pedicure', 'Manicure', 'Planchados', 'Proteínas', 'Moldeados', 'Faciales'];
+const SERVICE_EMOJI = ['💅', '🎨', '🦶', '✨', '💇‍♀️', '🧴', '🌀', '🧖‍♀️'];
 
 const SCHEDULE = {
   1: { am: ['10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00'], pm: ['16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'] },
@@ -53,32 +55,39 @@ function formatearFechaLabel(fechaIso) {
   return `${DIAS[date.getDay()]} ${date.getDate()} de ${MESES[date.getMonth()]}`;
 }
 
+// ─── Plantillas de mensajes (con mejor formato visual) ──────────────────────
+
 function menuServicios() {
-  return `💅 ¡Hola! Bienvenida a *${NEGOCIO}*.\n\n¿Qué servicio deseas agendar? Responde con el número:\n\n` +
-    SERVICES.map((s, i) => `${i + 1}. ${s}`).join('\n') +
-    `\n\n_También puedes escribir *mis citas* para ver tus citas agendadas._`;
+  const lista = SERVICES.map((s, i) => `${SERVICE_EMOJI[i]}  *${i + 1}.* ${s}`).join('\n');
+  return `✨ *${NEGOCIO}* ✨\n${DIVIDER}\n\n` +
+    `¡Hola! ¿Qué servicio deseas agendar hoy?\n\n` +
+    `${lista}\n\n${DIVIDER}\n` +
+    `✍️ _Responde solo con el número_\n` +
+    `📋 _Escribe *mis citas* para ver tus citas agendadas_`;
 }
 
 function menuFechas(fechas) {
-  return `📅 Elige una fecha:\n\n` +
-    fechas.map((f, i) => `${i + 1}. ${f.esHoy ? 'Hoy ' : ''}${f.label}`).join('\n') +
-    `\n\n_Escribe *cancelar* en cualquier momento para reiniciar._`;
+  const lista = fechas.map((f, i) => `🗓️  *${i + 1}.* ${f.esHoy ? '*Hoy* ' : ''}${f.label}`).join('\n');
+  return `📅 *Elige una fecha*\n${DIVIDER}\n\n${lista}\n\n${DIVIDER}\n` +
+    `↩️ _Escribe *cancelar* para reiniciar_`;
 }
 
 function menuHoras(horas) {
-  return `⏰ Estos son los horarios disponibles:\n\n` +
-    horas.map((h, i) => `${i + 1}. ${h}`).join('\n');
+  const lista = horas.map((h, i) => `🕐  *${i + 1}.* ${h}`).join('\n');
+  return `⏰ *Horarios disponibles*\n${DIVIDER}\n\n${lista}`;
 }
 
 function listarMisCitas(citas) {
   if (citas.length === 0) {
-    return `No tienes citas próximas agendadas 🙂\n\nEscribe *hola* para agendar una.`;
+    return `📋 *Tus citas*\n${DIVIDER}\n\n` +
+      `No tienes citas próximas agendadas 🙂\n\n` +
+      `✍️ _Escribe *hola* para agendar una_`;
   }
   const lista = citas.map((c, i) =>
-    `${i + 1}. ${c.servicio} — ${formatearFechaLabel(c.fecha)} a las ${c.hora}`
-  ).join('\n');
-  return `📋 Tus próximas citas:\n\n${lista}\n\n` +
-    `_Para cancelar una, escribe *cancelar cita* seguido del número. Ej: "cancelar cita 1"._`;
+    `*${i + 1}.* ${SERVICE_EMOJI[SERVICES.indexOf(c.servicio)] || '💅'} ${c.servicio}\n     🗓️ ${formatearFechaLabel(c.fecha)} — 🕐 ${c.hora}`
+  ).join('\n\n');
+  return `📋 *Tus próximas citas*\n${DIVIDER}\n\n${lista}\n\n${DIVIDER}\n` +
+    `❌ _Para cancelar, escribe *cancelar cita* y el número. Ej: "cancelar cita 1"_`;
 }
 
 /**
@@ -97,14 +106,15 @@ async function procesarMensaje(telefono, textoCrudo) {
     const idx = parseInt(texto, 10) - 1;
     const citasGuardadas = conv.datos.citas || [];
     if (isNaN(idx) || idx < 0 || idx >= citasGuardadas.length) {
-      return `No entendí 🙈 Responde solo con el número de la cita que quieres cancelar.\n\n` +
+      return `🙈 No entendí. Responde solo con el número de la cita que quieres cancelar.\n\n` +
         listarMisCitas(citasGuardadas);
     }
     const cita = citasGuardadas[idx];
     db.cancelarCita(cita.id);
     db.borrarConversacion(telefono);
-    return `✅ Tu cita de *${cita.servicio}* el ${formatearFechaLabel(cita.fecha)} a las ${cita.hora} fue cancelada.\n\n` +
-      `Escribe *hola* si quieres agendar otra.`;
+    return `✅ *Cita cancelada*\n${DIVIDER}\n\n` +
+      `${cita.servicio} — ${formatearFechaLabel(cita.fecha)} a las ${cita.hora}\n\n` +
+      `✍️ _Escribe *hola* si quieres agendar otra_`;
   }
 
   // ─── Comandos globales (funcionan en cualquier momento) ────────────────────
@@ -114,22 +124,22 @@ async function procesarMensaje(telefono, textoCrudo) {
   if (matchCancelarCita) {
     const citas = db.obtenerCitasPorTelefono(telefono);
     if (citas.length === 0) {
-      return `No tienes citas próximas para cancelar 🙂`;
+      return `🙂 No tienes citas próximas para cancelar.`;
     }
     const num = matchCancelarCita[1];
     if (!num) {
-      // Guardamos la lista y el estado, para saber qué hacer con el número que responda después
       db.guardarConversacion(telefono, 'ASK_CANCEL_NUM', { citas });
-      return `¿Cuál quieres cancelar? Responde con el número:\n\n` + listarMisCitas(citas);
+      return `❓ *¿Cuál quieres cancelar?* Responde con el número:\n\n` + listarMisCitas(citas);
     }
     const idx = parseInt(num, 10) - 1;
     if (idx < 0 || idx >= citas.length) {
-      return `No encontré esa cita. Estas son tus citas:\n\n` + listarMisCitas(citas);
+      return `🙈 No encontré esa cita.\n\n` + listarMisCitas(citas);
     }
     const cita = citas[idx];
     db.cancelarCita(cita.id);
-    return `✅ Tu cita de *${cita.servicio}* el ${formatearFechaLabel(cita.fecha)} a las ${cita.hora} fue cancelada.\n\n` +
-      `Escribe *hola* si quieres agendar otra.`;
+    return `✅ *Cita cancelada*\n${DIVIDER}\n\n` +
+      `${cita.servicio} — ${formatearFechaLabel(cita.fecha)} a las ${cita.hora}\n\n` +
+      `✍️ _Escribe *hola* si quieres agendar otra_`;
   }
 
   // Ver citas agendadas
@@ -140,7 +150,7 @@ async function procesarMensaje(telefono, textoCrudo) {
   // Cancelar el flujo de agendado en curso (no una cita ya guardada)
   if (['cancelar', 'reiniciar', 'salir'].includes(textoLower)) {
     db.borrarConversacion(telefono);
-    return '❌ Agendado cancelado. Escribe *hola* cuando quieras empezar de nuevo.';
+    return `❌ Agendado cancelado.\n\n✍️ _Escribe *hola* cuando quieras empezar de nuevo_`;
   }
 
   // ─── Máquina de estados del agendado ────────────────────────────────────────
@@ -156,43 +166,43 @@ async function procesarMensaje(telefono, textoCrudo) {
     case 'ASK_SERVICE': {
       const idx = parseInt(texto, 10) - 1;
       if (isNaN(idx) || idx < 0 || idx >= SERVICES.length) {
-        return `No entendí 🙈 Responde con un número del 1 al ${SERVICES.length}.\n\n` + menuServicios();
+        return `🙈 Responde con un número del 1 al ${SERVICES.length}.\n\n` + menuServicios();
       }
       datos.servicio = SERVICES[idx];
       datos.fechas = proximasFechas(6);
       db.guardarConversacion(telefono, 'ASK_DATE', datos);
-      return `Elegiste *${datos.servicio}* ✨\n\n` + menuFechas(datos.fechas);
+      return `${SERVICE_EMOJI[idx]} *${datos.servicio}* — ¡buena elección! ✨\n\n` + menuFechas(datos.fechas);
     }
 
     case 'ASK_DATE': {
       const idx = parseInt(texto, 10) - 1;
       if (isNaN(idx) || idx < 0 || idx >= datos.fechas.length) {
-        return `No entendí 🙈 Responde con un número del 1 al ${datos.fechas.length}.\n\n` + menuFechas(datos.fechas);
+        return `🙈 Responde con un número del 1 al ${datos.fechas.length}.\n\n` + menuFechas(datos.fechas);
       }
       const fecha = datos.fechas[idx];
       const horas = horariosDisponibles(fecha.iso, fecha.dow);
       if (horas.length === 0) {
-        return `😕 Ya no hay horarios para ese día. Elige otra fecha:\n\n` + menuFechas(datos.fechas);
+        return `😕 Ya no hay horarios para ese día.\n\n` + menuFechas(datos.fechas);
       }
       datos.fecha = fecha;
       datos.horas = horas;
       db.guardarConversacion(telefono, 'ASK_TIME', datos);
-      return `Fecha: *${fecha.label}* 📅\n\n` + menuHoras(horas);
+      return `🗓️ *${fecha.label}*\n\n` + menuHoras(horas);
     }
 
     case 'ASK_TIME': {
       const idx = parseInt(texto, 10) - 1;
       if (isNaN(idx) || idx < 0 || idx >= datos.horas.length) {
-        return `No entendí 🙈 Responde con un número del 1 al ${datos.horas.length}.\n\n` + menuHoras(datos.horas);
+        return `🙈 Responde con un número del 1 al ${datos.horas.length}.\n\n` + menuHoras(datos.horas);
       }
       datos.hora = datos.horas[idx];
       db.guardarConversacion(telefono, 'ASK_NAME', datos);
-      return `Hora: *${datos.hora}* ⏰\n\n¿Cuál es tu nombre completo?`;
+      return `🕐 *${datos.hora}*\n\n👤 ¿Cuál es tu nombre completo?`;
     }
 
     case 'ASK_NAME': {
       if (texto.length < 2) {
-        return 'Escribe tu nombre completo, por favor 🙂';
+        return '👤 Escribe tu nombre completo, por favor 🙂';
       }
       datos.nombre = texto;
 
@@ -206,12 +216,12 @@ async function procesarMensaje(telefono, textoCrudo) {
 
       db.guardarConversacion(telefono, 'DONE', {});
 
-      return `¡Listo, *${datos.nombre}*! 🎉 Tu cita quedó confirmada:\n\n` +
-        `✦ Servicio: ${datos.servicio}\n` +
-        `✦ Fecha: ${datos.fecha.label}\n` +
-        `✦ Hora: ${datos.hora}\n\n` +
-        `Te mandaremos un recordatorio un día antes. ¡Nos vemos pronto! 💅\n\n` +
-        `_Escribe *hola* para agendar otra, o *mis citas* para ver tus citas._`;
+      return `🎉 *¡Cita confirmada, ${datos.nombre}!*\n${DIVIDER}\n\n` +
+        `${SERVICE_EMOJI[SERVICES.indexOf(datos.servicio)]}  *Servicio:* ${datos.servicio}\n` +
+        `🗓️  *Fecha:* ${datos.fecha.label}\n` +
+        `🕐  *Hora:* ${datos.hora}\n\n${DIVIDER}\n` +
+        `💌 Te mandaremos un recordatorio un día antes.\n¡Nos vemos pronto! 💅\n\n` +
+        `✍️ _Escribe *hola* para agendar otra, o *mis citas* para ver tus citas_`;
     }
 
     default: {
