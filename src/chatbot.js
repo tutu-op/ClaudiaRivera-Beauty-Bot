@@ -70,8 +70,7 @@ function menuHoras(horas) {
     horas.map((h, i) => `${i + 1}. ${h}`).join('\n');
 }
 
-function listarMisCitas(telefono) {
-  const citas = db.obtenerCitasPorTelefono(telefono);
+function listarMisCitas(citas) {
   if (citas.length === 0) {
     return `No tienes citas próximas agendadas 🙂\n\nEscribe *hola* para agendar una.`;
   }
@@ -91,9 +90,26 @@ async function procesarMensaje(telefono, textoCrudo) {
   const texto = (textoCrudo || '').trim();
   const textoLower = texto.toLowerCase();
 
-  // ─── Comandos globales (funcionan en cualquier momento) ───────────────────
+  let conv = db.obtenerConversacion(telefono);
 
-  // Cancelar una cita YA agendada: "cancelar cita 2"
+  // ─── Si estábamos esperando el número de la cita a cancelar ───────────────
+  if (conv && conv.estado === 'ASK_CANCEL_NUM') {
+    const idx = parseInt(texto, 10) - 1;
+    const citasGuardadas = conv.datos.citas || [];
+    if (isNaN(idx) || idx < 0 || idx >= citasGuardadas.length) {
+      return `No entendí 🙈 Responde solo con el número de la cita que quieres cancelar.\n\n` +
+        listarMisCitas(citasGuardadas);
+    }
+    const cita = citasGuardadas[idx];
+    db.cancelarCita(cita.id);
+    db.borrarConversacion(telefono);
+    return `✅ Tu cita de *${cita.servicio}* el ${formatearFechaLabel(cita.fecha)} a las ${cita.hora} fue cancelada.\n\n` +
+      `Escribe *hola* si quieres agendar otra.`;
+  }
+
+  // ─── Comandos globales (funcionan en cualquier momento) ────────────────────
+
+  // Cancelar una cita YA agendada: "cancelar cita" o "cancelar cita 2"
   const matchCancelarCita = textoLower.match(/^cancelar\s+cita\s*(\d+)?$/);
   if (matchCancelarCita) {
     const citas = db.obtenerCitasPorTelefono(telefono);
@@ -102,11 +118,13 @@ async function procesarMensaje(telefono, textoCrudo) {
     }
     const num = matchCancelarCita[1];
     if (!num) {
-      return `¿Cuál quieres cancelar? Responde con el número:\n\n` + listarMisCitas(telefono);
+      // Guardamos la lista y el estado, para saber qué hacer con el número que responda después
+      db.guardarConversacion(telefono, 'ASK_CANCEL_NUM', { citas });
+      return `¿Cuál quieres cancelar? Responde con el número:\n\n` + listarMisCitas(citas);
     }
     const idx = parseInt(num, 10) - 1;
     if (idx < 0 || idx >= citas.length) {
-      return `No encontré esa cita. Estas son tus citas:\n\n` + listarMisCitas(telefono);
+      return `No encontré esa cita. Estas son tus citas:\n\n` + listarMisCitas(citas);
     }
     const cita = citas[idx];
     db.cancelarCita(cita.id);
@@ -116,7 +134,7 @@ async function procesarMensaje(telefono, textoCrudo) {
 
   // Ver citas agendadas
   if (['mis citas', 'ver citas', 'ver mis citas', 'citas'].includes(textoLower)) {
-    return listarMisCitas(telefono);
+    return listarMisCitas(db.obtenerCitasPorTelefono(telefono));
   }
 
   // Cancelar el flujo de agendado en curso (no una cita ya guardada)
@@ -125,9 +143,7 @@ async function procesarMensaje(telefono, textoCrudo) {
     return '❌ Agendado cancelado. Escribe *hola* cuando quieras empezar de nuevo.';
   }
 
-  // ─── Máquina de estados del agendado ───────────────────────────────────────
-
-  let conv = db.obtenerConversacion(telefono);
+  // ─── Máquina de estados del agendado ────────────────────────────────────────
 
   if (!conv || conv.estado === 'DONE') {
     db.guardarConversacion(telefono, 'ASK_SERVICE', {});
