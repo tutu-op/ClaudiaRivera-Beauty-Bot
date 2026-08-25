@@ -1,4 +1,4 @@
-# 🌸 Lupita Cuéllar Beauty Center — Bot de Citas
+# 🌸 ClaudiaRivera-Beauty-Bot — Bot de Citas
 
 Sistema de agendado con recordatorios automáticos por WhatsApp usando Twilio + Node.js + SQLite.
 
@@ -8,7 +8,7 @@ Sistema de agendado con recordatorios automáticos por WhatsApp usando Twilio + 
 
 ```bash
 # 1. Clonar / descomprimir el proyecto
-cd lupita-beauty-bot
+cd ClaudiaRivera-Beauty-Bot
 
 # 2. Instalar dependencias
 npm install
