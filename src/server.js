@@ -3,8 +3,10 @@ const express = require('express');
 const cors = require('cors');
 const cron = require('node-cron');
 const path = require('path');
+const twilio = require('twilio');
 const db = require('./database');
 const { sendWhatsApp, sendReminders } = require('./whatsapp');
+const { procesarMensaje } = require('./chatbot');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,59 +16,69 @@ db.initDb().then(() => console.log('✅ Base de datos lista'));
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: false })); // Twilio manda los webhooks como form-urlencoded
 app.use(express.static(path.join(__dirname, '../public')));
 
-// ─── RUTAS ────────────────────────────────────────────────────────────────────
-
-// Crear una cita nueva
-app.post('/api/citas', async (req, res) => {
-  const { nombre, telefono, servicio, fecha, hora } = req.body;
-
-  if (!nombre || !telefono || !servicio || !fecha || !hora) {
-    return res.status(400).json({ error: 'Faltan datos de la cita' });
-  }
+// ─── WEBHOOK DE WHATSAPP (chatbot conversacional) ────────────────────────────
+// Configura esta URL en Twilio: Messaging → WhatsApp Sandbox → "WHEN A MESSAGE COMES IN"
+// Ej: https://tu-dominio.com/whatsapp/webhook
+app.post('/whatsapp/webhook', async (req, res) => {
+  const { MessagingResponse } = twilio.twiml;
+  const twiml = new MessagingResponse();
 
   try {
+    const from = req.body.From || '';           // ej: "whatsapp:+523120000000"
+    const telefono = from.replace('whatsapp:', '');
+    const texto = req.body.Body || '';
+
+    const respuesta = await procesarMensaje(telefono, texto);
+    twiml.message(respuesta);
+  } catch (err) {
+    console.error('Error en webhook de WhatsApp:', err);
+    twiml.message('❌ Ocurrió un error. Escribe *hola* para reiniciar.');
+  }
+
+  res.type('text/xml').send(twiml.toString());
+});
+
+// ─── API para el widget web de agendado ──────────────────────────────────────
+app.post('/api/citas', async (req, res) => {
+  try {
+    const { nombre, telefono, servicio, fecha, hora } = req.body;
+    if (!nombre || !telefono || !servicio || !fecha || !hora) {
+      return res.status(400).json({ ok: false, error: 'Faltan datos' });
+    }
+
     const cita = db.crearCita({ nombre, telefono, servicio, fecha, hora });
 
-    // Enviar confirmación inmediata por WhatsApp
-    await sendWhatsApp(
-      telefono,
-      `✨ ¡Hola ${nombre}! Tu cita en *Lupita Cuéllar Beauty Center* ha sido confirmada.\n\n` +
-      `📋 *Servicio:* ${servicio}\n` +
-      `📅 *Fecha:* ${fecha}\n` +
-      `⏰ *Hora:* ${hora}\n\n` +
-      `Te recordaremos el día anterior. ¡Nos vemos pronto! 💅`
-    );
+    // Confirmación por WhatsApp
+    try {
+      await sendWhatsApp(
+        telefono,
+        `✨ ¡Hola ${nombre}! Tu cita en *Claudia Rivera Beauty Center* ha sido confirmada.\n\n` +
+        `✦ Servicio: ${servicio}\n✦ Fecha: ${fecha}\n✦ Hora: ${hora}\n\n` +
+        `Te mandaremos un recordatorio un día antes. ¡Nos vemos pronto! 💅`
+      );
+    } catch (err) {
+      console.error('No se pudo enviar confirmación de WhatsApp:', err.message);
+    }
 
     res.json({ ok: true, cita });
   } catch (err) {
-    console.error('Error al crear cita:', err);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    console.error('Error creando cita:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });
 
-// Obtener todas las citas (para panel admin)
 app.get('/api/citas', (req, res) => {
-  const citas = db.obtenerCitas();
-  res.json(citas);
+  res.json(db.obtenerCitas());
 });
 
-// Cancelar una cita
-app.delete('/api/citas/:id', (req, res) => {
-  db.cancelarCita(req.params.id);
-  res.json({ ok: true });
-});
-
-// ─── CRON: Recordatorios cada día a las 10:00 AM (hora México) ───────────────
-// '0 10 * * *' = todos los días a las 10:00 AM
-cron.schedule('0 10 * * *', async () => {
-  console.log('⏰ Enviando recordatorios del día...');
-  await sendReminders();
-}, {
-  timezone: 'America/Mexico_City'
+// Recordatorios automáticos todos los días a las 10 AM
+cron.schedule('0 10 * * *', () => {
+  sendReminders();
 });
 
 app.listen(PORT, () => {
-  console.log(`🌸 Lupita Beauty Bot corriendo en http://localhost:${PORT}`);
+  console.log(`🌸 Claudia Rivera Beauty Bot corriendo en http://localhost:${PORT}`);
 });

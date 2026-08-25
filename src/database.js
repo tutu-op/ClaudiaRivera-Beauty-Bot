@@ -6,7 +6,6 @@ const DB_PATH = path.join(__dirname, '../citas.db');
 
 let db;
 
-// Inicializar base de datos (sincrónico con wrapper)
 function getDb() {
   if (db) return db;
   throw new Error('Base de datos no inicializada. Llama a initDb() primero.');
@@ -32,6 +31,15 @@ async function initDb() {
       hora      TEXT NOT NULL,
       recordatorio_enviado INTEGER DEFAULT 0,
       creada_en TEXT DEFAULT (datetime('now','localtime'))
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS conversaciones (
+      telefono   TEXT PRIMARY KEY,
+      estado     TEXT NOT NULL,
+      datos      TEXT NOT NULL DEFAULT '{}',
+      actualizada TEXT DEFAULT (datetime('now','localtime'))
     )
   `);
 
@@ -62,6 +70,18 @@ function obtenerCitas() {
   return values.map(row => Object.fromEntries(columns.map((col, i) => [col, row[i]])));
 }
 
+// Citas futuras (hoy en adelante) de un teléfono específico, ordenadas por fecha/hora
+function obtenerCitasPorTelefono(telefono) {
+  const hoy = new Date().toISOString().split('T')[0];
+  const result = getDb().exec(
+    'SELECT * FROM citas WHERE telefono = ? AND fecha >= ? ORDER BY fecha, hora',
+    [telefono, hoy]
+  );
+  if (!result.length) return [];
+  const { columns, values } = result[0];
+  return values.map(row => Object.fromEntries(columns.map((col, i) => [col, row[i]])));
+}
+
 function citasDeManana() {
   const manana = new Date();
   manana.setDate(manana.getDate() + 1);
@@ -85,4 +105,33 @@ function cancelarCita(id) {
   saveDb();
 }
 
-module.exports = { initDb, crearCita, obtenerCitas, citasDeManana, marcarRecordatorioEnviado, cancelarCita };
+// ─── Conversaciones de WhatsApp (estado del chatbot) ─────────────────────────
+
+function obtenerConversacion(telefono) {
+  const result = getDb().exec('SELECT estado, datos FROM conversaciones WHERE telefono = ?', [telefono]);
+  if (!result.length) return null;
+  const { columns, values } = result[0];
+  const row = Object.fromEntries(columns.map((col, i) => [col, values[0][i]]));
+  return { estado: row.estado, datos: JSON.parse(row.datos) };
+}
+
+function guardarConversacion(telefono, estado, datos) {
+  getDb().run(
+    `INSERT INTO conversaciones (telefono, estado, datos, actualizada)
+     VALUES (?, ?, ?, datetime('now','localtime'))
+     ON CONFLICT(telefono) DO UPDATE SET estado = excluded.estado, datos = excluded.datos, actualizada = excluded.actualizada`,
+    [telefono, estado, JSON.stringify(datos)]
+  );
+  saveDb();
+}
+
+function borrarConversacion(telefono) {
+  getDb().run('DELETE FROM conversaciones WHERE telefono = ?', [telefono]);
+  saveDb();
+}
+
+module.exports = {
+  initDb, crearCita, obtenerCitas, obtenerCitasPorTelefono, citasDeManana,
+  marcarRecordatorioEnviado, cancelarCita,
+  obtenerConversacion, guardarConversacion, borrarConversacion
+};
