@@ -70,7 +70,6 @@ function obtenerCitas() {
   return values.map(row => Object.fromEntries(columns.map((col, i) => [col, row[i]])));
 }
 
-// Citas futuras (hoy en adelante) de un teléfono específico, ordenadas por fecha/hora
 function obtenerCitasPorTelefono(telefono) {
   const hoy = new Date().toISOString().split('T')[0];
   const result = getDb().exec(
@@ -130,8 +129,48 @@ function borrarConversacion(telefono) {
   saveDb();
 }
 
+// ─── Estadísticas ─────────────────────────────────────────────────────────
+
+function obtenerEstadisticas() {
+  const todas = obtenerCitas();
+  const hoy = new Date().toISOString().split('T')[0];
+  const futuras = todas.filter(c => c.fecha >= hoy);
+  const pasadas = todas.filter(c => c.fecha < hoy);
+
+  // Conteo por servicio
+  const porServicio = {};
+  todas.forEach(c => {
+    porServicio[c.servicio] = (porServicio[c.servicio] || 0) + 1;
+  });
+  const servicioTop = Object.entries(porServicio).sort((a, b) => b[1] - a[1])[0];
+
+  // Conteo por día de la semana (0=domingo..6=sábado)
+  const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const porDiaSemana = {};
+  todas.forEach(c => {
+    const [y, m, d] = c.fecha.split('-').map(Number);
+    const dow = new Date(y, m - 1, d).getDay();
+    const nombreDia = DIAS[dow];
+    porDiaSemana[nombreDia] = (porDiaSemana[nombreDia] || 0) + 1;
+  });
+
+  // Próximas 7 citas
+  const proximas = futuras.slice(0, 7);
+
+  return {
+    totalCitas: todas.length,
+    citasFuturas: futuras.length,
+    citasPasadas: pasadas.length,
+    porServicio,
+    servicioTop: servicioTop ? { nombre: servicioTop[0], cantidad: servicioTop[1] } : null,
+    porDiaSemana,
+    proximas
+  };
+}
+
 module.exports = {
   initDb, crearCita, obtenerCitas, obtenerCitasPorTelefono, citasDeManana,
   marcarRecordatorioEnviado, cancelarCita,
-  obtenerConversacion, guardarConversacion, borrarConversacion
+  obtenerConversacion, guardarConversacion, borrarConversacion,
+  obtenerEstadisticas
 };

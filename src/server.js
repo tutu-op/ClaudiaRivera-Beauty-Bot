@@ -20,14 +20,12 @@ app.use(express.urlencoded({ extended: false })); // Twilio manda los webhooks c
 app.use(express.static(path.join(__dirname, '../public')));
 
 // ─── WEBHOOK DE WHATSAPP (chatbot conversacional) ────────────────────────────
-// Configura esta URL en Twilio: Messaging → WhatsApp Sandbox → "WHEN A MESSAGE COMES IN"
-// Ej: https://tu-dominio.com/whatsapp/webhook
 app.post('/whatsapp/webhook', async (req, res) => {
   const { MessagingResponse } = twilio.twiml;
   const twiml = new MessagingResponse();
 
   try {
-    const from = req.body.From || '';           // ej: "whatsapp:+523120000000"
+    const from = req.body.From || '';
     const telefono = from.replace('whatsapp:', '');
     const texto = req.body.Body || '';
 
@@ -51,7 +49,6 @@ app.post('/api/citas', async (req, res) => {
 
     const cita = db.crearCita({ nombre, telefono, servicio, fecha, hora });
 
-    // Confirmación por WhatsApp
     try {
       await sendWhatsApp(
         telefono,
@@ -72,6 +69,11 @@ app.post('/api/citas', async (req, res) => {
 
 app.get('/api/citas', (req, res) => {
   res.json(db.obtenerCitas());
+});
+
+// ─── API de estadísticas (para el dashboard) ─────────────────────────────────
+app.get('/api/estadisticas', (req, res) => {
+  res.json(db.obtenerEstadisticas());
 });
 
 // Recordatorios automáticos todos los días a las 10 AM

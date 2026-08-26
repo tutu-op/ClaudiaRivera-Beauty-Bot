@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claudia Rivera Beauty Center — Estadísticas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Jost', sans-serif;
+      background: #f5f0eb;
+      color: #2a1f1a;
+      min-height: 100vh;
+      padding: 2rem 1.25rem 4rem;
+    }
+
+    .wrap { max-width: 960px; margin: 0 auto; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .brand-eyebrow { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #8a7060; }
+    h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 400;
+      font-size: clamp(28px, 4vw, 40px);
+      color: #1a1014;
+      margin-top: 4px;
+    }
+    .live-dot {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; color: #8a7060; letter-spacing: 0.5px;
+    }
+    .live-dot::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: #6fcf97; display: inline-block;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 14px;
+      margin-bottom: 2.5rem;
+    }
+    .stat-card {
+      background: #fff;
+      border: 0.5px solid #e0d6cc;
+      border-radius: 14px;
+      padding: 1.4rem 1.4rem 1.2rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::after {
+      content: '';
+      position: absolute; top: 0; left: 0; width: 3px; height: 100%;
+      background: #c9a46e;
+    }
+    .stat-num {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 42px;
+      font-weight: 400;
+      color: #1a1014;
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 11.5px; color: #8a7060; margin-top: 8px;
+      letter-spacing: 0.3px;
+    }
+
+    .panels { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; }
+    @media (max-width: 720px) { .panels { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: #fff;
+      border: 0.5px solid #e0d6cc;
+      border-radius: 14px;
+      padding: 1.5rem;
+    }
+    .panel-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 19px; color: #1a1014; margin-bottom: 1.1rem;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .bar-row { margin-bottom: 12px; }
+    .bar-row:last-child { margin-bottom: 0; }
+    .bar-label {
+      display: flex; justify-content: space-between; font-size: 12.5px;
+      margin-bottom: 4px; color: #2a1f1a;
+    }
+    .bar-label span:last-child { color: #8a7060; }
+    .bar-track { height: 7px; background: #f5f0eb; border-radius: 4px; overflow: hidden; }
+    .bar-fill {
+      height: 100%; background: linear-gradient(90deg, #c9a46e, #e8c99a);
+      border-radius: 4px; transition: width 0.6s ease;
+      width: 0%;
+    }
+
+    .cita-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 0; border-bottom: 0.5px solid #f0e9e0; font-size: 13px;
+    }
+    .cita-item:last-child { border-bottom: none; }
+    .cita-nombre { font-weight: 500; }
+    .cita-detalle { color: #8a7060; font-size: 11.5px; margin-top: 2px; }
+    .cita-badge {
+      background: #1a1014; color: #e8c99a; font-size: 10.5px;
+      padding: 3px 9px; border-radius: 20px; white-space: nowrap;
+    }
+
+    .empty-msg { color: #8a7060; font-size: 12.5px; font-style: italic; }
+
+    .highlight-banner {
+      margin-top: 20px;
+      background: #1a1014; color: #e8c99a;
+      border-radius: 14px; padding: 1.3rem 1.5rem;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .highlight-banner .icon { font-size: 26px; }
+    .highlight-banner .text-small { font-size: 11px; color: #c9a46e; letter-spacing: 0.5px; }
+    .highlight-banner .text-big { font-family: 'Cormorant Garamond', serif; font-size: 20px; margin-top: 2px; }
+
+    .loading { text-align: center; padding: 4rem 0; color: #8a7060; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="brand-eyebrow">Claudia Rivera Beauty Center</div>
+      <h1>Resumen de citas</h1>
+    </div>
+    <div class="live-dot">Actualizado ahora</div>
+  </header>
+
+  <div id="content">
+    <div class="loading">Cargando estadísticas…</div>
+  </div>
+</div>
+
+<script>
+async function cargarEstadisticas() {
+  const content = document.getElementById('content');
+  try {
+    const res = await fetch('/api/estadisticas');
+    const data = await res.json();
+    render(data);
+  } catch (err) {
+    content.innerHTML = '<div class="loading">No se pudieron cargar las estadísticas.</div>';
+  }
+}
+
+function render(data) {
+  const DIAS_ORDEN = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+
+  const content = document.getElementById('content');
+
+  // ─── Tarjetas superiores ───
+  const statsHtml = `
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-num">${data.citasFuturas}</div>
+        <div class="stat-label">Citas próximas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">${data.totalCitas}</div>
+        <div class="stat-label">Total histórico</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">${data.citasPasadas}</div>
+        <div class="stat-label">Citas atendidas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">${data.servicioTop ? data.servicioTop.cantidad : 0}</div>
+        <div class="stat-label">${data.servicioTop ? data.servicioTop.nombre : 'Servicio top'}</div>
+      </div>
+    </div>
+  `;
+
+  // ─── Panel: servicios más pedidos ───
+  const serviciosOrdenados = Object.entries(data.porServicio).sort((a, b) => b[1] - a[1]);
+  const maxServicio = serviciosOrdenados.length ? serviciosOrdenados[0][1] : 1;
+  const serviciosHtml = serviciosOrdenados.length
+    ? serviciosOrdenados.map(([nombre, cant]) => `
+        <div class="bar-row">
+          <div class="bar-label"><span>${nombre}</span><span>${cant}</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(cant / maxServicio) * 100}%"></div></div>
+        </div>
+      `).join('')
+    : '<div class="empty-msg">Aún no hay citas registradas.</div>';
+
+  // ─── Panel: días más ocupados ───
+  const diasOrdenados = DIAS_ORDEN
+    .map(d => [d, data.porDiaSemana[d] || 0])
+    .filter(([, cant]) => cant > 0)
+    .sort((a, b) => b[1] - a[1]);
+  const maxDia = diasOrdenados.length ? diasOrdenados[0][1] : 1;
+  const diasHtml = diasOrdenados.length
+    ? diasOrdenados.map(([dia, cant]) => `
+        <div class="bar-row">
+          <div class="bar-label"><span>${dia}</span><span>${cant}</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(cant / maxDia) * 100}%"></div></div>
+        </div>
+      `).join('')
+    : '<div class="empty-msg">Aún no hay citas registradas.</div>';
+
+  // ─── Panel: próximas citas ───
+  const proximasHtml = data.proximas.length
+    ? data.proximas.map(c => `
+        <div class="cita-item">
+          <div>
+            <div class="cita-nombre">${c.nombre}</div>
+            <div class="cita-detalle">${c.servicio} · ${c.fecha} · ${c.hora}</div>
+          </div>
+          <div class="cita-badge">${c.hora}</div>
+        </div>
+      `).join('')
+    : '<div class="empty-msg">No hay citas agendadas todavía.</div>';
+
+  content.innerHTML = `
+    ${statsHtml}
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-title">💅 Servicios más pedidos</div>
+        ${serviciosHtml}
+      </div>
+      <div class="panel">
+        <div class="panel-title">📅 Días más ocupados</div>
+        ${diasHtml}
+      </div>
+    </div>
+    <div class="panel" style="margin-top:20px">
+      <div class="panel-title">🗓️ Próximas citas</div>
+      ${proximasHtml}
+    </div>
+    ${data.servicioTop ? `
+      <div class="highlight-banner">
+        <div class="icon">✨</div>
+        <div>
+          <div class="text-small">SERVICIO ESTRELLA</div>
+          <div class="text-big">${data.servicioTop.nombre} — ${data.servicioTop.cantidad} citas</div>
+        </div>
+      </div>
+    ` : ''}
+  `;
+}
+
+cargarEstadisticas();
+// Refresca solo si dejas la pestaña abierta
+setInterval(cargarEstadisticas, 60000);
+</script>
+</body>
+</html>
