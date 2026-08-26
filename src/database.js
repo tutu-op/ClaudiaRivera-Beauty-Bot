@@ -81,6 +81,13 @@ function obtenerCitasPorTelefono(telefono) {
   return values.map(row => Object.fromEntries(columns.map((col, i) => [col, row[i]])));
 }
 
+// Horas que YA están ocupadas en una fecha específica (para evitar dobles citas)
+function horasOcupadas(fecha) {
+  const result = getDb().exec('SELECT hora FROM citas WHERE fecha = ?', [fecha]);
+  if (!result.length) return [];
+  return result[0].values.map(v => v[0]);
+}
+
 function citasDeManana() {
   const manana = new Date();
   manana.setDate(manana.getDate() + 1);
@@ -137,14 +144,12 @@ function obtenerEstadisticas() {
   const futuras = todas.filter(c => c.fecha >= hoy);
   const pasadas = todas.filter(c => c.fecha < hoy);
 
-  // Conteo por servicio
   const porServicio = {};
   todas.forEach(c => {
     porServicio[c.servicio] = (porServicio[c.servicio] || 0) + 1;
   });
   const servicioTop = Object.entries(porServicio).sort((a, b) => b[1] - a[1])[0];
 
-  // Conteo por día de la semana (0=domingo..6=sábado)
   const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   const porDiaSemana = {};
   todas.forEach(c => {
@@ -154,7 +159,6 @@ function obtenerEstadisticas() {
     porDiaSemana[nombreDia] = (porDiaSemana[nombreDia] || 0) + 1;
   });
 
-  // Próximas 7 citas
   const proximas = futuras.slice(0, 7);
 
   return {
@@ -169,7 +173,7 @@ function obtenerEstadisticas() {
 }
 
 module.exports = {
-  initDb, crearCita, obtenerCitas, obtenerCitasPorTelefono, citasDeManana,
+  initDb, crearCita, obtenerCitas, obtenerCitasPorTelefono, horasOcupadas, citasDeManana,
   marcarRecordatorioEnviado, cancelarCita,
   obtenerConversacion, guardarConversacion, borrarConversacion,
   obtenerEstadisticas

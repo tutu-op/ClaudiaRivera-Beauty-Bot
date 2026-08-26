@@ -6,14 +6,8 @@ const DIVIDER = '┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄';
 const SERVICES = ['Uñas', 'Color', 'Pedicure', 'Manicure', 'Planchados', 'Proteínas', 'Moldeados', 'Faciales'];
 const SERVICE_EMOJI = ['💅', '🎨', '🦶', '✨', '💇‍♀️', '🧴', '🌀', '🧖‍♀️'];
 
-const SCHEDULE = {
-  1: { am: ['10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00'], pm: ['16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'] },
-  2: { am: ['10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00'], pm: ['16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'] },
-  3: { am: ['10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00'], pm: ['16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'] },
-  4: { am: ['10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00'], pm: ['16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'] },
-  5: { am: ['10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00'], pm: ['16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'] },
-  6: { am: ['8:30', '9:00', '9:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00'], pm: ['13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'] }
-};
+// Horario único: 3:00 pm a 7:30 pm, todos los días que atiende (lunes a sábado)
+const HORAS_NEGOCIO = ['15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'];
 
 const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -22,7 +16,7 @@ function proximasFechas(cantidad) {
   const fechas = [];
   const cursor = new Date();
   while (fechas.length < cantidad) {
-    if (cursor.getDay() !== 0) {
+    if (cursor.getDay() !== 0) { // domingo cerrado
       const label = `${DIAS[cursor.getDay()]} ${cursor.getDate()} de ${MESES[cursor.getMonth()]}`;
       const iso = new Date(cursor).toISOString().split('T')[0];
       fechas.push({ iso, label, dow: cursor.getDay(), esHoy: fechas.length === 0 && sonMismoDia(cursor, new Date()) });
@@ -36,17 +30,25 @@ function sonMismoDia(a, b) {
   return a.toDateString() === b.toDateString();
 }
 
+// Devuelve las horas libres de un día: quita las que ya pasaron (si es hoy) y las ya ocupadas en la BD
 function horariosDisponibles(fechaIso, dow) {
-  const sched = SCHEDULE[dow];
-  if (!sched) return [];
-  const todos = [...sched.am, ...sched.pm];
+  if (dow === 0) return []; // domingo cerrado
+
+  let horas = [...HORAS_NEGOCIO];
+
   const esHoy = fechaIso === new Date().toISOString().split('T')[0];
-  if (!esHoy) return todos;
-  const ahora = new Date();
-  return todos.filter(t => {
-    const [h, m] = t.split(':').map(Number);
-    return (h * 60 + m) > (ahora.getHours() * 60 + ahora.getMinutes() + 30);
-  });
+  if (esHoy) {
+    const ahora = new Date();
+    horas = horas.filter(t => {
+      const [h, m] = t.split(':').map(Number);
+      return (h * 60 + m) > (ahora.getHours() * 60 + ahora.getMinutes() + 30);
+    });
+  }
+
+  const ocupadas = db.horasOcupadas(fechaIso);
+  horas = horas.filter(h => !ocupadas.includes(h));
+
+  return horas;
 }
 
 function formatearFechaLabel(fechaIso) {
@@ -55,7 +57,7 @@ function formatearFechaLabel(fechaIso) {
   return `${DIAS[date.getDay()]} ${date.getDate()} de ${MESES[date.getMonth()]}`;
 }
 
-// ─── Plantillas de mensajes (con mejor formato visual) ──────────────────────
+// ─── Plantillas de mensajes ──────────────────────────────────────────────────
 
 function menuServicios() {
   const lista = SERVICES.map((s, i) => `${SERVICE_EMOJI[i]}  *${i + 1}.* ${s}`).join('\n');
@@ -73,8 +75,11 @@ function menuFechas(fechas) {
 }
 
 function menuHoras(horas) {
+  if (horas.length === 0) {
+    return `😕 Ya no quedan horarios libres ese día.`;
+  }
   const lista = horas.map((h, i) => `🕐  *${i + 1}.* ${h}`).join('\n');
-  return `⏰ *Horarios disponibles*\n${DIVIDER}\n\n${lista}`;
+  return `⏰ *Horarios disponibles* (3:00 pm - 7:30 pm)\n${DIVIDER}\n\n${lista}`;
 }
 
 function listarMisCitas(citas) {
@@ -92,8 +97,6 @@ function listarMisCitas(citas) {
 
 /**
  * Procesa un mensaje entrante y devuelve el texto de respuesta.
- * @param {string} telefono - número normalizado, ej "+523120000000"
- * @param {string} textoCrudo - mensaje que escribió la clienta
  */
 async function procesarMensaje(telefono, textoCrudo) {
   const texto = (textoCrudo || '').trim();
@@ -117,9 +120,8 @@ async function procesarMensaje(telefono, textoCrudo) {
       `✍️ _Escribe *hola* si quieres agendar otra_`;
   }
 
-  // ─── Comandos globales (funcionan en cualquier momento) ────────────────────
+  // ─── Comandos globales ───────────────────────────────────────────────────
 
-  // Cancelar una cita YA agendada: "cancelar cita" o "cancelar cita 2"
   const matchCancelarCita = textoLower.match(/^cancelar\s+cita\s*(\d+)?$/);
   if (matchCancelarCita) {
     const citas = db.obtenerCitasPorTelefono(telefono);
@@ -142,12 +144,10 @@ async function procesarMensaje(telefono, textoCrudo) {
       `✍️ _Escribe *hola* si quieres agendar otra_`;
   }
 
-  // Ver citas agendadas
   if (['mis citas', 'ver citas', 'ver mis citas', 'citas'].includes(textoLower)) {
     return listarMisCitas(db.obtenerCitasPorTelefono(telefono));
   }
 
-  // Cancelar el flujo de agendado en curso (no una cita ya guardada)
   if (['cancelar', 'reiniciar', 'salir'].includes(textoLower)) {
     db.borrarConversacion(telefono);
     return `❌ Agendado cancelado.\n\n✍️ _Escribe *hola* cuando quieras empezar de nuevo_`;
@@ -182,7 +182,7 @@ async function procesarMensaje(telefono, textoCrudo) {
       const fecha = datos.fechas[idx];
       const horas = horariosDisponibles(fecha.iso, fecha.dow);
       if (horas.length === 0) {
-        return `😕 Ya no hay horarios para ese día.\n\n` + menuFechas(datos.fechas);
+        return `😕 Ya no hay horarios para ese día. Elige otra fecha:\n\n` + menuFechas(datos.fechas);
       }
       datos.fecha = fecha;
       datos.horas = horas;
@@ -205,6 +205,14 @@ async function procesarMensaje(telefono, textoCrudo) {
         return '👤 Escribe tu nombre completo, por favor 🙂';
       }
       datos.nombre = texto;
+
+      // Revalidar que el horario siga libre (por si alguien más lo tomó mientras tanto)
+      const horasActuales = horariosDisponibles(datos.fecha.iso, datos.fecha.dow);
+      if (!horasActuales.includes(datos.hora)) {
+        datos.horas = horasActuales;
+        db.guardarConversacion(telefono, 'ASK_TIME', datos);
+        return `😕 *¡Justo se ocupó ese horario!* Elige otro:\n\n` + menuHoras(horasActuales);
+      }
 
       db.crearCita({
         nombre: datos.nombre,

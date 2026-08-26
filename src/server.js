@@ -11,15 +11,14 @@ const { procesarMensaje } = require('./chatbot');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Inicializar DB antes de arrancar
 db.initDb().then(() => console.log('✅ Base de datos lista'));
 
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: false })); // Twilio manda los webhooks como form-urlencoded
+app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, '../public')));
 
-// ─── WEBHOOK DE WHATSAPP (chatbot conversacional) ────────────────────────────
+// ─── WEBHOOK DE WHATSAPP ──────────────────────────────────────────────────────
 app.post('/whatsapp/webhook', async (req, res) => {
   const { MessagingResponse } = twilio.twiml;
   const twiml = new MessagingResponse();
@@ -47,6 +46,12 @@ app.post('/api/citas', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Faltan datos' });
     }
 
+    // Evitar citas duplicadas en el mismo horario
+    const ocupadas = db.horasOcupadas(fecha);
+    if (ocupadas.includes(hora)) {
+      return res.status(409).json({ ok: false, error: 'Ese horario ya está ocupado, elige otro.' });
+    }
+
     const cita = db.crearCita({ nombre, telefono, servicio, fecha, hora });
 
     try {
@@ -71,12 +76,17 @@ app.get('/api/citas', (req, res) => {
   res.json(db.obtenerCitas());
 });
 
-// ─── API de estadísticas (para el dashboard) ─────────────────────────────────
+// Devuelve las horas ya ocupadas en una fecha (para que el widget web las bloquee)
+app.get('/api/horas-ocupadas', (req, res) => {
+  const { fecha } = req.query;
+  if (!fecha) return res.status(400).json({ error: 'Falta el parámetro fecha' });
+  res.json(db.horasOcupadas(fecha));
+});
+
 app.get('/api/estadisticas', (req, res) => {
   res.json(db.obtenerEstadisticas());
 });
 
-// Recordatorios automáticos todos los días a las 10 AM
 cron.schedule('0 10 * * *', () => {
   sendReminders();
 });

@@ -121,6 +121,7 @@
     }
     .tslot:hover { border-color: #c9a46e; color: #c9a46e; }
     .tslot.selected { background: #1a1014; color: #e8c99a; border-color: #1a1014; }
+    .tslot.ocupado { opacity: 0.35; text-decoration: line-through; cursor: not-allowed; pointer-events: none; }
 
     .form-field { margin-top: 8px; }
     .form-label { font-size: 11px; color: #888; margin-bottom: 3px; }
@@ -172,14 +173,8 @@ const SERVICES = [
   "Uñas","Color","Pedicure","Manicure","Planchados","Proteínas","Moldeados","Faciales"
 ];
 
-const SCHEDULE = {
-  1:{am:["10:00","10:30","11:00","11:30","12:00","12:30","13:00"],pm:["16:30","17:00","17:30","18:00","18:30","19:00","19:30"]},
-  2:{am:["10:00","10:30","11:00","11:30","12:00","12:30","13:00"],pm:["16:30","17:00","17:30","18:00","18:30","19:00","19:30"]},
-  3:{am:["10:00","10:30","11:00","11:30","12:00","12:30","13:00"],pm:["16:30","17:00","17:30","18:00","18:30","19:00","19:30"]},
-  4:{am:["10:00","10:30","11:00","11:30","12:00","12:30","13:00"],pm:["16:30","17:00","17:30","18:00","18:30","19:00","19:30"]},
-  5:{am:["10:00","10:30","11:00","11:30","12:00","12:30","13:00"],pm:["16:30","17:00","17:30","18:00","18:30","19:00","19:30"]},
-  6:{am:["8:30","9:00","9:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00"],pm:["13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30"]}
-};
+// Horario único: 3:00 pm a 7:30 pm, todos los días (excepto domingo)
+const HORAS_NEGOCIO = ["15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30"];
 
 let state = { service:null, date:null, time:null, name:null, phone:null };
 
@@ -248,9 +243,10 @@ function askDate() {
     d.appendChild(buildCal());
     const label = document.createElement('div');
     label.style.cssText = 'font-size:11px;color:#888;margin-top:8px;margin-bottom:2px';
-    label.textContent = 'Horarios disponibles:';
+    label.textContent = 'Horarios disponibles (3:00 pm - 7:30 pm):';
     d.appendChild(label);
     timeContainer = document.createElement('div');
+    timeContainer.innerHTML = '<span style="font-size:11.5px;color:#aaa">Elige una fecha primero</span>';
     d.appendChild(timeContainer);
     addMsg('bot', d);
   });
@@ -285,7 +281,13 @@ function buildCal() {
         wrap.querySelectorAll('.cal-day').forEach(c => c.classList.remove('selected'));
         cell.classList.add('selected');
         state.date = date;
-        if (timeContainer) { timeContainer.innerHTML = ''; timeContainer.appendChild(buildTimeSlots(date)); }
+        if (timeContainer) {
+          timeContainer.innerHTML = '<span style="font-size:11.5px;color:#aaa">Cargando horarios…</span>';
+          buildTimeSlots(date).then(el => {
+            timeContainer.innerHTML = '';
+            timeContainer.appendChild(el);
+          });
+        }
       };
     }
     grid.appendChild(cell);
@@ -294,34 +296,65 @@ function buildCal() {
   return wrap;
 }
 
-function buildTimeSlots(date) {
-  const dow = date.getDay();
-  const sched = SCHEDULE[dow];
+async function buildTimeSlots(date) {
   const wrap = document.createElement('div');
-  if (!sched) { wrap.innerHTML = '<span style="font-size:12px;color:#aaa">No hay horarios disponibles.</span>'; return wrap; }
-  const slots = document.createElement('div'); slots.className = 'time-slots';
+  const dow = date.getDay();
+  if (dow === 0) {
+    wrap.innerHTML = '<span style="font-size:12px;color:#aaa">Cerrado los domingos.</span>';
+    return wrap;
+  }
+
+  const fechaIso = date.toISOString().split('T')[0];
+
+  // Consultamos qué horas ya están ocupadas ese día
+  let ocupadas = [];
+  try {
+    const res = await fetch('/api/horas-ocupadas?fecha=' + fechaIso);
+    ocupadas = await res.json();
+  } catch (err) {
+    console.error('No se pudieron cargar horas ocupadas', err);
+  }
+
   const now = new Date();
   const isToday = date.toDateString() === now.toDateString();
-  const allSlots = [...sched.am, ...sched.pm].filter(t => {
-    if (!isToday) return true;
+
+  const slots = document.createElement('div'); slots.className = 'time-slots';
+  let hayAlgunaLibre = false;
+
+  HORAS_NEGOCIO.forEach(t => {
     const [h, m] = t.split(':').map(Number);
-    return (h * 60 + m) > (now.getHours() * 60 + now.getMinutes() + 30);
-  });
-  if (allSlots.length === 0) { wrap.innerHTML = '<span style="font-size:12px;color:#aaa">No hay más horarios disponibles hoy.</span>'; return wrap; }
-  allSlots.forEach(t => {
-    const b = document.createElement('button'); b.className = 'tslot'; b.textContent = t;
-    b.onclick = () => {
-      slots.querySelectorAll('.tslot').forEach(s => s.classList.remove('selected'));
-      b.classList.add('selected');
-      state.time = t;
-      const days = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
-      const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-      const ds = days[date.getDay()]+' '+date.getDate()+' de '+months[date.getMonth()];
-      addMsg('user', ds + ' · ' + t);
-      askContact();
-    };
+    const yaPaso = isToday && (h * 60 + m) <= (now.getHours() * 60 + now.getMinutes() + 30);
+    const estaOcupada = ocupadas.includes(t);
+
+    if (yaPaso) return; // ni lo mostramos si ya pasó
+
+    const b = document.createElement('button');
+    b.className = 'tslot' + (estaOcupada ? ' ocupado' : '');
+    b.textContent = t;
+
+    if (estaOcupada) {
+      b.disabled = true;
+    } else {
+      hayAlgunaLibre = true;
+      b.onclick = () => {
+        slots.querySelectorAll('.tslot').forEach(s => s.classList.remove('selected'));
+        b.classList.add('selected');
+        state.time = t;
+        const days = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+        const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+        const ds = days[date.getDay()]+' '+date.getDate()+' de '+months[date.getMonth()];
+        addMsg('user', ds + ' · ' + t);
+        askContact();
+      };
+    }
     slots.appendChild(b);
   });
+
+  if (!hayAlgunaLibre) {
+    wrap.innerHTML = '<span style="font-size:12px;color:#aaa">No hay horarios libres ese día.</span>';
+    return wrap;
+  }
+
   wrap.appendChild(slots);
   return wrap;
 }
@@ -358,7 +391,6 @@ function askContact() {
 }
 
 async function confirmarCita(btn) {
-  // Formatear fecha como YYYY-MM-DD
   const fecha = state.date.toISOString().split('T')[0];
 
   try {
@@ -378,6 +410,9 @@ async function confirmarCita(btn) {
 
     if (data.ok) {
       showSuccess();
+    } else if (res.status === 409) {
+      btn.disabled = false; btn.textContent = 'Confirmar cita →';
+      typing(() => addMsg('bot', '😕 Justo se ocupó ese horario. Por favor elige otro.'));
     } else {
       btn.disabled = false; btn.textContent = 'Confirmar cita →';
       typing(() => addMsg('bot', '❌ Hubo un error al agendar. Intenta de nuevo.'));
@@ -428,7 +463,6 @@ function sendUserMsg() {
   typing(() => addMsg('bot', 'Para agendar tu cita usa las opciones del menú 😊'));
 }
 
-// Arrancar
 setTimeout(() => {
   typing(() => {
     addMsg('bot', '¡Hola! 👋 Bienvenida a <b>Claudia Rivera Beauty Center</b>.<br>Estoy aquí para ayudarte a agendar tu cita. ¿Comenzamos?');
